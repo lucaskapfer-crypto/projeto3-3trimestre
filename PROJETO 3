@@ -1,0 +1,178 @@
+from dataclasses import dataclass
+import random
+import time
+
+
+@dataclass
+class Bebida:
+    nome: str
+    preco: float
+    tempo_preparo: int
+
+
+@dataclass
+class Cliente:
+    nome: str
+    pedido: Bebida
+    paciencia: int
+
+
+CARDAPIO: list[Bebida] = [
+    Bebida("Expresso", 7.50, 1),
+    Bebida("Cappuccino", 12.00, 2),
+    Bebida("Latte Baunilha", 14.50, 2),
+    Bebida("Mocha Gelado", 16.00, 3),
+    Bebida("Chá Verde", 9.00, 1),
+    Bebida("Chocolate Quente", 13.00, 2),
+]
+
+NOMES_CLIENTES: list[str] = [
+    "Ana", "Bruno", "Carla", "Diego", "Elena",
+    "Felipe", "Gabriela", "Henrique", "Isabela", "João",
+]
+
+
+class Cafeteria:
+    """Simula o funcionamento diário de uma cafeteria com clientes e eventos."""
+
+    def __init__(self, nome: str = "Grão & Folha", duracao_turnos: int = 12) -> None:
+        self.nome = nome
+        self.duracao_turnos = duracao_turnos
+        self.turno = 1
+        self.caixa = 150.00
+        self.graos = 40
+        self.atendidos = 0
+        self.desistencias = 0
+        self.fila: list[Cliente] = []
+        self.historico: list[str] = []
+
+    def gerar_cliente(self) -> Cliente:
+        nome = random.choice(NOMES_CLIENTES)
+        bebida = random.choice(CARDAPIO)
+        paciencia = random.randint(2, 4)
+        return Cliente(nome=nome, pedido=bebida, paciencia=paciencia)
+
+    def chegada_clientes(self) -> None:
+        novos = random.randint(0, 2)
+        for _ in range(novos):
+            if len(self.fila) < 6:
+                cliente = self.gerar_cliente()
+                self.fila.append(cliente)
+                print(
+                    f"[CHEGADA] {cliente.nome} entrou e pediu '{cliente.pedido.nome}' "
+                    f"(paciência: {cliente.paciencia})."
+                )
+            else:
+                self.desistencias += 1
+                print("[FILA CHEIA] Um cliente olhou a fila lotada e foi embora.")
+
+    def evento_do_turno(self) -> None:
+        sorteio = random.randint(1, 5)
+        if sorteio == 1:
+            extra = random.randint(15, 30)
+            self.graos += extra
+            msg = f"Fornecedor entregou +{extra} doses de grãos."
+            print(f"[ESTOQUE] {msg}")
+            self.historico.append(f"Turno {self.turno}: {msg}")
+        elif sorteio == 2:
+            if self.fila:
+                escolhido = random.choice(self.fila)
+                escolhido.paciencia += 1
+                msg = f"{escolhido.nome} estava lendo um livro e ganhou +1 de paciência."
+                print(f"[CLIMA] {msg}")
+                self.historico.append(f"Turno {self.turno}: {msg}")
+        elif sorteio == 3:
+            custo = 25.00
+            if self.caixa >= custo:
+                self.caixa -= custo
+                msg = f"Manutenção rápida na máquina de café (-R$ {custo:.2f})."
+                print(f"[MANUTENÇÃO] {msg}")
+                self.historico.append(f"Turno {self.turno}: {msg}")
+
+    def atender_proximo(self) -> None:
+        if not self.fila:
+            print("[BARISTA] Nenhum cliente na fila; limpando o balcão.")
+            return
+
+        if self.graos <= 0:
+            print("[SEM GRÃOS] Não há grãos suficientes para preparar bebidas!")
+            return
+
+        cliente = self.fila.pop(0)
+        self.graos -= 1
+        self.caixa += cliente.pedido.preco
+        self.atendidos += 1
+        print(
+            f"[ATENDIDO] {cliente.nome} recebeu '{cliente.pedido.nome}' "
+            f"(+R$ {cliente.pedido.preco:.2f})."
+        )
+        self.historico.append(
+            f"Turno {self.turno}: Serviu {cliente.pedido.nome} para {cliente.nome}."
+        )
+
+    def comprar_graos(self) -> None:
+        pacote = 25
+        preco_pacote = 45.00
+        if self.caixa >= preco_pacote:
+            self.caixa -= preco_pacote
+            self.graos += pacote
+            print(f"[COMPRA] Adquiriu +{pacote} doses de grãos por R$ {preco_pacote:.2f}.")
+        else:
+            print("[CAIXA] Saldo insuficiente para comprar pacote de grãos.")
+
+    def atualizar_paciencia(self) -> None:
+        restantes: list[Cliente] = []
+        for cliente in self.fila:
+            cliente.paciencia -= 1
+            if cliente.paciencia <= 0:
+                self.desistencias += 1
+                print(f"[DESISTÊNCIA] {cliente.nome} cansou de esperar e saiu.")
+            else:
+                restantes.append(cliente)
+        self.fila = restantes
+
+    def exibir_status(self) -> None:
+        print("\n" + "-" * 50)
+        print(f" CAFETERIA {self.nome.upper()} | TURNO {self.turno}/{self.duracao_turnos} ")
+        print("-" * 50)
+        print(f" Caixa: R$ {self.caixa:6.2f} | Grãos: {self.graos:2d} | Fila: {len(self.fila)}")
+        print(f" Atendidos: {self.atendidos:2d} | Desistências: {self.desistencias:2d}")
+        if self.fila:
+            nomes_fila = ", ".join(f"{c.nome}({c.paciencia})" for c in self.fila)
+            print(f" Aguardando: {nomes_fila}")
+
+    def rodar(self, automatico: bool = True, pausa: float = 0.05) -> None:
+        print(f"Abrindo as portas da {self.nome}...")
+        while self.turno <= self.duracao_turnos:
+            self.exibir_status()
+            self.chegada_clientes()
+            self.evento_do_turno()
+
+            if automatico:
+                if self.graos < 5 and self.caixa >= 45.00:
+                    acao = "2"
+                else:
+                    acao = random.choice(["1", "1", "2", "3"])
+            else:
+                print("\n[1] Atender próximo cliente | [2] Comprar grãos (R$ 45) | [3] Descansar")
+                acao = input("Escolha: ").strip()
+
+            if acao == "1":
+                self.atender_proximo()
+            elif acao == "2":
+                self.comprar_graos()
+            else:
+                print("[PAUSA] Barista respirou fundo por um instante.")
+
+            self.atualizar_paciencia()
+            self.turno += 1
+            time.sleep(pausa)
+
+        self.exibir_status()
+        print(f"\nEncerrando o expediente da {self.nome}!")
+        print(f"Resumo final: {self.atendidos} bebidas servidas, caixa em R$ {self.caixa:.2f}.")
+
+
+if __name__ == "__main__":
+    cafeteria = Cafeteria(nome="Grão & Folha", duracao_turnos=12)
+    cafeteria.rodar(automatico=True, pausa=0.05)
